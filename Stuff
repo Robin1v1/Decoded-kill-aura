@@ -1,0 +1,217 @@
+local Killaura = {Enabled = false}
+	local KillauraCPS = {GetRandomValue = function() return 1 end}
+	local KillauraMethod = {Value = "Normal"}
+	local KillauraTarget = {Enabled = false}
+	local KillauraColor = {Value = 0.44}
+	local KillauraRange = {Value = 1}
+	local KillauraAngle = {Value = 90}
+	local KillauraFakeAngle = {Enabled = false}
+	local KillauraPrediction = {Enabled = true}	
+	local KillauraButtonDown = {Enabled = false}
+	local KillauraTargetHighlight = {Enabled = false}
+	local KillauraRangeCircle = {Enabled = false}
+	local KillauraRangeCirclePart
+	local KillauraSwingTick = tick()
+	local KillauraBoxes = {}
+	local OriginalNeckC0
+	local OriginalRootC0
+	for i = 1, 10 do 
+		local KillauraBox = Instance.new("BoxHandleAdornment")
+		KillauraBox.Transparency = 0.5
+		KillauraBox.Color3 = Color3.fromHSV(KillauraColor.Hue, KillauraColor.Sat, KillauraColor.Value)
+		KillauraBox.Adornee = nil
+		KillauraBox.AlwaysOnTop = true
+		KillauraBox.Size = Vector3.new(3, 6, 3)
+		KillauraBox.ZIndex = 11
+		KillauraBox.Parent = GuiLibrary.MainGui
+		KillauraBoxes[i] = KillauraBox
+	end
+
+	Killaura = GuiLibrary.ObjectsThatCanBeSaved.BlatantWindow.Api.CreateOptionsButton({
+		Name = "Killaura", 
+		Function = function(callback)
+			if callback then
+				if KillauraRangeCirclePart then KillauraRangeCirclePart.Parent = gameCamera end
+				RunLoops:BindToHeartbeat("Killaura", function()
+					for i,v in pairs(KillauraBoxes) do 
+						if v.Adornee then
+							local onex, oney, onez = v.Adornee.CFrame:ToEulerAnglesXYZ() 
+							v.CFrame = CFrame.new() * CFrame.Angles(-onex, -oney, -onez)
+						end
+					end
+					if entityLibrary.isAlive then 
+						if KillauraRangeCirclePart then
+							KillauraRangeCirclePart.CFrame = entityLibrary.character.HumanoidRootPart.CFrame - Vector3.new(0, entityLibrary.character.Humanoid.HipHeight + (entityLibrary.character.HumanoidRootPart.Size.Y / 2) - 0.3, 0)
+						end
+						if KillauraFakeAngle.Enabled then 
+							local Neck = entityLibrary.character.Head:FindFirstChild("Neck")
+							local LowerTorso = entityLibrary.character.HumanoidRootPart.Parent and entityLibrary.character.HumanoidRootPart.Parent:FindFirstChild("LowerTorso")
+							local RootC0 = LowerTorso and LowerTorso:FindFirstChild("Root")
+							if Neck and RootC0 then
+								if not OriginalNeckC0 then OriginalNeckC0 = Neck.C0.p end
+								if not OriginalRootC0 then OriginalRootC0 = RootC0.C0.p end
+								if OriginalRootC0 then
+									if targetedplayer ~= nil then
+										local targetPos = targetedplayer.RootPart.Position + Vector3.new(0, targetedplayer.Humanoid.HipHeight + (targetedplayer.RootPart.Size.Y / 2), 0)
+										local lookCFrame = (CFrame.new(Vector3.zero, (Root.CFrame):VectorToObjectSpace((Vector3.new(targetPos.X, targetPos.Y, targetPos.Z) - entityLibrary.character.Head.Position).Unit)))
+										Neck.C0 = CFrame.new(OriginalNeckC0) * CFrame.Angles(lookCFrame.LookVector.Unit.y, 0, 0)
+										RootC0.C0 = (CFrame.new(Vector3.zero, (Root.CFrame):VectorToObjectSpace((Vector3.new(targetPos.X, Root.Position.Y, targetPos.Z) - Root.Position).Unit))) + OriginalRootC0
+									else
+										Neck.C0 = CFrame.new(OriginalNeckC0)
+										RootC0.C0 = CFrame.new(OriginalRootC0)
+									end
+								end
+							end
+						end
+					end
+				end)
+				task.spawn(function()
+					repeat
+						local attackedplayers = {}
+						KillauraNearTarget = false
+						vapeTargetInfo.Targets.Killaura = nil
+						if entityLibrary.isAlive and (not KillauraButtonDown.Enabled or inputService:IsMouseButtonPressed(0)) then
+							local plrs = AllNearPosition(KillauraRange.Value, 100, {Prediction = KillauraPrediction.Enabled})
+							if #plrs > 0 then
+								local tool = lplr.Character:FindFirstChildWhichIsA("Tool")
+								local touch = findTouchInterest(tool)
+								if tool and touch then
+									for i,v in pairs(plrs) do
+										if math.acos(entityLibrary.character.HumanoidRootPart.CFrame.lookVector:Dot((v.RootPart.Position - entityLibrary.character.HumanoidRootPart.Position).Unit)) >= (math.rad(KillauraAngle.Value) / 2) then continue end
+										KillauraNearTarget = true
+										if KillauraTarget.Enabled then
+											table.insert(attackedplayers, v)
+										end
+										vapeTargetInfo.Targets.Killaura = v
+										if not ({WhitelistFunctions:GetWhitelist(v.Player)})[2] then
+											continue
+										end
+										KillauraNearTarget = true
+										if KillauraPrediction.Enabled then
+											if (entityLibrary.LocalPosition - v.RootPart.Position).Magnitude > KillauraRange.Value then
+												continue
+											end
+										end
+										if KillauraSwingTick <= tick() then
+											tool:Activate()
+											KillauraSwingTick = tick() + (1 / KillauraCPS.GetRandomValue())
+										end
+										if KillauraMethod.Value == "Bypass" then 
+											attackIgnore.FilterDescendantsInstances = {v.Character}
+											local parts = workspace:GetPartBoundsInBox(v.RootPart.CFrame, v.Character:GetExtentsSize(), attackIgnore)
+											for i,v2 in pairs(parts) do 
+												firetouchinterest(touch.Parent, v2, 1)
+												firetouchinterest(touch.Parent, v2, 0)
+											end
+										elseif KillauraMethod.Value == "Normal" then
+											for i,v2 in pairs(v.Character:GetChildren()) do 
+												if v2:IsA("BasePart") then
+													firetouchinterest(touch.Parent, v2, 1)
+													firetouchinterest(touch.Parent, v2, 0)
+												end
+											end
+										else
+											firetouchinterest(touch.Parent, v.RootPart, 1)
+											firetouchinterest(touch.Parent, v.RootPart, 0)
+										end
+									end
+								end
+							end
+						end
+						for i,v in pairs(KillauraBoxes) do 
+							local attacked = attackedplayers[i]
+							v.Adornee = attacked and attacked.RootPart
+						end
+						task.wait()
+					until not Killaura.Enabled
+				end)
+			else
+				RunLoops:UnbindFromHeartbeat("Killaura") 
+                KillauraNearTarget = false
+				vapeTargetInfo.Targets.Killaura = nil
+				for i,v in pairs(KillauraBoxes) do v.Adornee = nil end
+				if KillauraRangeCirclePart then KillauraRangeCirclePart.Parent = nil end
+			end
+		end,
+		HoverText = "Attack players around you\nwithout aiming at them."
+	})
+	KillauraMethod = Killaura.CreateDropdown({
+		Name = "Mode",
+		List = {"Normal", "Bypass", "Root Only"},
+		Function = function() end
+	})
+	KillauraCPS = Killaura.CreateTwoSlider({
+		Name = "Attacks per second",
+		Min = 1,
+		Max = 20,
+		Default = 8,
+		Default2 = 12
+	})
+	KillauraRange = Killaura.CreateSlider({
+		Name = "Attack range",
+		Min = 1,
+		Max = 150, 
+		Function = function(val) 
+			if KillauraRangeCirclePart then 
+				KillauraRangeCirclePart.Size = Vector3.new(val * 0.7, 0.01, val * 0.7)
+			end
+		end
+	})
+	KillauraAngle = Killaura.CreateSlider({
+		Name = "Max angle",
+		Min = 1,
+		Max = 360, 
+		Function = function(val) end,
+		Default = 90
+	})
+	KillauraColor = Killaura.CreateColorSlider({
+		Name = "Target Color",
+		Function = function(hue, sat, val) 
+			for i,v in pairs(KillauraBoxes) do 
+				v.Color3 = Color3.fromHSV(hue, sat, val)
+			end
+			if KillauraRangeCirclePart then 
+				KillauraRangeCirclePart.Color = Color3.fromHSV(hue, sat, val)
+			end
+		end,
+		Default = 1
+	})
+	KillauraButtonDown = Killaura.CreateToggle({
+		Name = "Require mouse down", 
+		Function = function() end
+	})
+	KillauraTarget = Killaura.CreateToggle({
+        Name = "Show target",
+        Function = function(callback) end,
+		HoverText = "Shows a red box over the opponent."
+    })
+	KillauraPrediction = Killaura.CreateToggle({
+		Name = "Prediction",
+		Function = function() end
+	})
+	KillauraFakeAngle = Killaura.CreateToggle({
+        Name = "Face target",
+        Function = function() end,
+		HoverText = "Makes your character face the opponent."
+    })
+	KillauraRangeCircle = Killaura.CreateToggle({
+		Name = "Range Visualizer",
+		Function = function(callback)
+			if callback then 
+				KillauraRangeCirclePart = Instance.new("MeshPart")
+				KillauraRangeCirclePart.MeshId = "rbxassetid://3726303797"
+				KillauraRangeCirclePart.Color = Color3.fromHSV(KillauraColor.Hue, KillauraColor.Sat, KillauraColor.Value)
+				KillauraRangeCirclePart.CanCollide = false
+				KillauraRangeCirclePart.Anchored = true
+				KillauraRangeCirclePart.Material = Enum.Material.Neon
+				KillauraRangeCirclePart.Size = Vector3.new(KillauraRange.Value * 0.7, 0.01, KillauraRange.Value * 0.7)
+				KillauraRangeCirclePart.Parent = gameCamera
+			else
+				if KillauraRangeCirclePart then 
+					KillauraRangeCirclePart:Destroy()
+					KillauraRangeCirclePart = nil
+				end
+			end
+		end
+	})
+end)
